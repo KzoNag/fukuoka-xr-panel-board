@@ -1,0 +1,438 @@
+<!doctype html>
+<html lang="ja" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>パネルボード — 福岡XR部</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  /* 進行役キーが無いときは操作類を出さない(表示専用) */
+  body:not(.admin) .admin-only { display: none !important; }
+
+  .bar {
+    display: flex; justify-content: space-between; align-items: center; gap: 16px;
+    padding: 12px 28px; border-bottom: 1px solid var(--line); flex: 0 0 auto;
+  }
+  .bar h1 { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.1rem, 1.8vw, 1.6rem); letter-spacing: .02em; }
+  .bar .eyebrow { font-size: clamp(.7rem, .9vw, .85rem); }
+  .bar-right { display: flex; align-items: center; gap: 16px; }
+  .hash { font-weight: 700; color: var(--accent); font-size: clamp(.9rem, 1.3vw, 1.2rem); }
+
+  .grid { flex: 1 1 auto; min-height: 0; display: grid; grid-template-columns: 1fr minmax(360px, 40%); }
+  .stage { display: flex; flex-direction: column; padding: 24px 36px 16px; min-width: 0; min-height: 0; }
+  .stage > .main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; }
+
+  /* 募集中 */
+  .collect { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: center; }
+  .collect h2 { font-family: var(--font-display); font-weight: 400; font-size: clamp(1.8rem, 3.6vw, 3.4rem); line-height: 1.2; margin-top: 10px; }
+  .collect p { color: var(--muted); font-size: clamp(1rem, 1.4vw, 1.3rem); margin-top: 16px; max-width: 32em; }
+  .url { font-family: var(--font-display); font-size: clamp(1rem, 1.6vw, 1.5rem); margin-top: 14px; color: var(--accent); overflow-wrap: anywhere; }
+  .collect-hint { margin-top: 18px; color: var(--muted); font-size: .9rem; }
+  .qr { background: #fff; border-radius: 16px; padding: 12px; line-height: 0; }
+  .qr svg { width: 100%; height: 100%; display: block; }
+  .qr-big { width: clamp(180px, 22vw, 340px); height: clamp(180px, 22vw, 340px); }
+  .qr-small { width: 88px; height: 88px; padding: 6px; border-radius: 10px; }
+
+  /* ディスカッション中 */
+  .live .eyebrow { font-size: clamp(.8rem, 1.1vw, 1rem); color: var(--accent); }
+  .topic-title { font-weight: 700; line-height: 1.25; margin-top: 12px; overflow-wrap: anywhere; }
+  .topic-title.xl { font-size: clamp(2rem, 4.4vw, 4.2rem); }
+  .topic-title.lg { font-size: clamp(1.6rem, 3.4vw, 3.2rem); }
+  .topic-title.md { font-size: clamp(1.3rem, 2.6vw, 2.5rem); }
+  .by { color: var(--muted); font-size: clamp(1rem, 1.4vw, 1.3rem); margin-top: 12px; }
+
+  .timer { margin-top: clamp(16px, 3.5vh, 40px); }
+  .digits { font-family: var(--font-display); font-size: clamp(4rem, 10.5vw, 9.5rem); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: .02em; color: var(--ink); }
+  .timer .track { height: 10px; border-radius: 999px; background: var(--surface-2); margin-top: 16px; overflow: hidden; }
+  .timer .fill { height: 100%; width: 100%; background: var(--accent); border-radius: 999px; transition: width .25s linear; }
+  .timer-note { margin-top: 10px; font-size: clamp(1rem, 1.5vw, 1.4rem); font-weight: 700; color: var(--muted); min-height: 1.5em; }
+  .timer.warn .digits, .timer.warn .timer-note { color: var(--accent); }
+  .timer.over .digits, .timer.over .timer-note { color: var(--danger); }
+  .timer.over .fill { background: var(--danger); }
+  .timer.over .digits { animation: pulse 1s ease-in-out infinite; }
+  .timer.paused .digits { opacity: .55; }
+  @keyframes pulse { 50% { opacity: .35; } }
+
+  /* 進行役の操作ボタン(投影されるので控えめに) */
+  .op {
+    border: 1px solid var(--line); background: var(--surface-2); color: var(--ink);
+    border-radius: 8px; padding: .35em .75em; font-size: .82rem; font-weight: 700; line-height: 1.2;
+    min-height: 32px; cursor: pointer; white-space: nowrap;
+  }
+  .op:hover { border-color: var(--muted); }
+  .op:active { transform: scale(.97); }
+  .op:focus-visible { outline: 3px solid var(--vote); outline-offset: 2px; }
+  .op-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .op-danger { color: var(--danger); }
+  .timer-ops { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
+  .timer-ops .spacer { flex: 1; }
+
+  .stage-foot { display: flex; align-items: center; gap: 18px; flex: 0 0 auto; padding-top: 14px; border-top: 1px solid var(--line); margin-top: 14px; }
+  .foot-label { font-size: .85rem; color: var(--muted); font-weight: 700; letter-spacing: .06em; }
+  .foot-url { font-family: var(--font-display); font-size: clamp(.95rem, 1.3vw, 1.25rem); color: var(--ink); overflow-wrap: anywhere; }
+  .audio { margin-left: auto; font-size: .8rem; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: .35em .9em; cursor: pointer; white-space: nowrap; background: transparent; }
+  .audio.on { color: var(--ok); border-color: var(--ok); }
+
+  /* 一覧 */
+  .list { border-left: 1px solid var(--line); background: var(--surface); display: flex; flex-direction: column; min-height: 0; }
+  .list-head { display: flex; justify-content: space-between; align-items: baseline; padding: 16px 24px 10px; }
+  .list-head h3 { font-size: clamp(1rem, 1.4vw, 1.3rem); }
+  .list-head span { color: var(--muted); font-size: .9rem; }
+  ol { list-style: none; margin: 0; padding: 0 16px 12px; overflow-y: auto; flex: 1 1 auto; display: grid; gap: 8px; align-content: start; }
+  .row { display: flex; gap: 14px; align-items: flex-start; padding: 10px 14px; border-radius: 12px; border: 1px solid transparent; }
+  .row.now { background: var(--accent-soft); border-color: var(--accent); }
+  .row.done { opacity: .5; }
+  .votes { flex: 0 0 auto; width: 3.2em; text-align: center; display: grid; line-height: 1; padding-top: 2px; }
+  .votes .n { font-family: var(--font-display); font-size: clamp(1.3rem, 2vw, 1.9rem); font-variant-numeric: tabular-nums; }
+  .votes .lbl { font-size: .7rem; color: var(--muted); margin-top: 3px; }
+  .row.now .votes .n { color: var(--accent); }
+  .row .body { min-width: 0; flex: 1; }
+  .row .t { font-weight: 700; font-size: clamp(1rem, 1.3vw, 1.25rem); line-height: 1.35; overflow-wrap: anywhere; }
+  .row.done .t { text-decoration: line-through; }
+  .row .m { display: flex; gap: .6em; align-items: center; margin-top: 3px; font-size: .8rem; color: var(--muted); }
+  .row .ops { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .empty { color: var(--muted); padding: 24px 12px; text-align: center; }
+
+  .list-foot { flex: 0 0 auto; border-top: 1px solid var(--line); padding: 10px 16px 12px; display: grid; gap: 8px; }
+  .add { display: flex; gap: 8px; }
+  .add .input { flex: 1; min-height: 36px; padding: .4em .8em; font-size: .9rem; }
+  details.settings summary { cursor: pointer; font-size: .82rem; color: var(--muted); font-weight: 700; user-select: none; }
+  details.settings[open] summary { margin-bottom: 8px; }
+  .settings-body { display: grid; gap: 8px; font-size: .85rem; }
+  .settings-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .settings-row .input { flex: 1 1 140px; min-height: 34px; padding: .35em .7em; font-size: .85rem; }
+  .settings-row .input.short { flex: 0 0 4.5em; text-align: center; }
+  .danger-ops { display: flex; gap: 6px; flex-wrap: wrap; padding-top: 6px; border-top: 1px dashed var(--line); }
+
+  .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: var(--bg); padding: .7em 1.2em; border-radius: 999px; font-weight: 700; font-size: .9rem; max-width: calc(100vw - 32px); z-index: 10; }
+
+  /* 720p のウィンドウにブラウザのタブバーが乗ると実高さは 620px 前後。フッターのQRが隠れないよう詰める */
+  @media (max-height: 760px) {
+    .stage { padding: 14px 28px 10px; }
+    .digits { font-size: clamp(3rem, 7.5vw, 6rem); }
+    .timer { margin-top: 10px; }
+    .timer .track { margin-top: 8px; }
+    .timer-ops { margin-top: 10px; }
+    .topic-title { margin-top: 6px; }
+    .topic-title.xl { font-size: clamp(1.6rem, 3.4vw, 3rem); }
+    .topic-title.lg { font-size: clamp(1.4rem, 2.7vw, 2.5rem); }
+    .topic-title.md { font-size: clamp(1.2rem, 2.1vw, 1.9rem); }
+    .by { margin-top: 6px; }
+    .collect h2 { font-size: clamp(1.5rem, 3vw, 2.6rem); }
+    .qr-big { width: clamp(150px, 18vw, 260px); height: clamp(150px, 18vw, 260px); }
+    .stage-foot { padding-top: 10px; margin-top: 10px; }
+  }
+
+  @media (max-width: 900px) {
+    body { overflow: auto; }
+    .grid { grid-template-columns: 1fr; }
+    .collect { grid-template-columns: 1fr; }
+    .list { border-left: 0; border-top: 1px solid var(--line); }
+    ol { overflow: visible; }
+  }
+</style>
+</head>
+<body>
+<header class="bar">
+  <div>
+    <div class="eyebrow" id="eventTitle">福岡XR部ミートアップ 2026.09</div>
+    <h1>パネルディスカッション</h1>
+  </div>
+  <div class="bar-right">
+    <span id="conn" class="conn admin-only">接続中…</span>
+    <div class="hash">#福岡XR部</div>
+  </div>
+</header>
+
+<main class="grid">
+  <section class="stage">
+    <div class="main">
+      <div id="collect" class="collect">
+        <div>
+          <div class="eyebrow">トピック募集中</div>
+          <h2>気になる話題を<br>投げてください</h2>
+          <p>スマホでQRを読むかURLを開いて、トピックの投稿と「話したい」投票を。匿名OK、何個でも。</p>
+          <div class="url" id="urlBig"></div>
+          <div class="collect-hint admin-only">進行役: 右の一覧から「▶ 話す」でトピックを選ぶとタイマーが始まります</div>
+        </div>
+        <div class="qr qr-big" id="qrBig"></div>
+      </div>
+
+      <div id="live" class="live" hidden>
+        <div class="eyebrow">いま話しているトピック</div>
+        <h2 class="topic-title" id="curTitle"></h2>
+        <div class="by" id="curBy"></div>
+        <div class="timer" id="timer">
+          <div class="digits" id="digits">07:00</div>
+          <div class="track"><div class="fill" id="fill"></div></div>
+          <div class="timer-note" id="timerNote"></div>
+        </div>
+        <div class="timer-ops admin-only">
+          <button class="op" data-act="timer-toggle" id="toggleBtn">⏸ 一時停止</button>
+          <button class="op" data-act="timer" data-arg="reset">↺ リセット</button>
+          <button class="op" data-act="add" data-arg="60">+1分</button>
+          <button class="op" data-act="add" data-arg="180">+3分</button>
+          <span class="spacer"></span>
+          <button class="op op-primary" data-act="done-current">✓ 済にする</button>
+          <button class="op" data-act="clear-current">外す</button>
+        </div>
+      </div>
+    </div>
+
+    <footer class="stage-foot" id="stageFoot">
+      <div class="qr qr-small" id="qrSmall"></div>
+      <div>
+        <div class="foot-label">トピック投稿・投票はこちら</div>
+        <div class="foot-url" id="urlSmall"></div>
+      </div>
+      <button class="audio" id="audio" type="button">チャイム: オフ（クリックで有効）</button>
+    </footer>
+  </section>
+
+  <aside class="list">
+    <div class="list-head"><h3>トピック一覧</h3><span id="count"></span></div>
+    <ol id="topics"></ol>
+    <div class="list-foot admin-only">
+      <form id="addForm" class="add">
+        <input id="addTitle" class="input" maxlength="100" placeholder="運営でトピックを追加" autocomplete="off" required>
+        <button class="op op-primary" type="submit">追加</button>
+      </form>
+      <details class="settings">
+        <summary>設定・危険な操作</summary>
+        <div class="settings-body">
+          <div class="settings-row">
+            <input id="publicUrl" class="input" placeholder="参加者URL（QRに使う。start.sh が自動で入れる）">
+            <button class="op" data-act="saveUrl">保存</button>
+          </div>
+          <div class="settings-row">
+            <span>1トピック</span><input id="defMin" class="input short" type="number" min="1" max="60" step="1"><span>分</span>
+            <button class="op" data-act="saveMin">保存</button>
+            <input id="evTitle" class="input" maxlength="60" placeholder="イベント名">
+            <button class="op" data-act="saveTitle">保存</button>
+          </div>
+          <div class="danger-ops">
+            <button class="op op-danger" data-act="reset" data-arg="votes">投票を全部リセット</button>
+            <button class="op op-danger" data-act="reset" data-arg="done">済をすべて戻す</button>
+            <button class="op op-danger" data-act="reset" data-arg="all">トピックを全部消す</button>
+          </div>
+        </div>
+      </details>
+    </div>
+  </aside>
+</main>
+<div id="toast" class="toast" hidden></div>
+
+<script src="/vendor/qrcode.min.js"></script>
+<script src="/app.js"></script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+
+  // ---- 進行役キー: ?key= で受け取り、以後は localStorage から ----
+  const params = new URLSearchParams(location.search);
+  let key = params.get('key');
+  try {
+    if (key) localStorage.setItem('pd.adminKey', key);
+    else key = localStorage.getItem('pd.adminKey');
+  } catch {}
+  let admin = false;
+  if (key) {
+    PD.api('/api/admin/ping', 'GET', null, key)
+      .then(() => { admin = true; document.body.classList.add('admin'); render(); })
+      .catch(() => toast('進行役キーが違います。表示専用で開いています'));
+  }
+  const A = (path, method = 'POST', body) => PD.api(path, method, body, key).catch(e => { toast(e.message); throw e; });
+
+  let S = null, now = () => Date.now(), lastUrl = null, firedFor = null;
+  const dirty = { url: false, min: false, title: false };
+
+  PD.connect((s, n) => { S = s; now = n; render(); }, st => {
+    const el = $('#conn');
+    el.classList.toggle('off', st !== 'live');
+    el.textContent = st === 'live' ? 'ライブ' : '再接続中…';
+  });
+
+  function drawQr(el, url) {
+    try {
+      const qr = qrcode(0, 'M');
+      qr.addData(url); qr.make();
+      el.innerHTML = qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true });
+    } catch { el.textContent = url; }
+  }
+
+  function render() {
+    if (!S) return;
+    $('#eventTitle').textContent = S.eventTitle;
+    const url = S.publicUrl || location.origin;
+    if (url !== lastUrl) {
+      lastUrl = url;
+      const shown = url.replace(/^https?:\/\//, '');
+      drawQr($('#qrBig'), url); drawQr($('#qrSmall'), url);
+      $('#urlBig').textContent = shown; $('#urlSmall').textContent = shown;
+    }
+    const cur = S.topics.find(t => t.id === S.currentId);
+    $('#collect').hidden = !!cur;
+    $('#live').hidden = !cur;
+    $('#stageFoot').style.visibility = cur ? 'visible' : 'hidden';
+    if (cur) {
+      const el = $('#curTitle');
+      el.textContent = cur.title;
+      const len = cur.title.length;
+      el.className = 'topic-title ' + (len <= 22 ? 'xl' : len <= 45 ? 'lg' : 'md');
+      $('#curBy').textContent = cur.author ? `by ${cur.author}` : '';
+    }
+    if (admin) {
+      if (!dirty.url) $('#publicUrl').value = S.publicUrl || '';
+      if (!dirty.min) $('#defMin').value = S.defaultMinutes;
+      if (!dirty.title) $('#evTitle').value = S.eventTitle;
+    }
+    renderList();
+    tick();
+  }
+
+  function ops(t, isCur, isDone) {
+    if (!admin) return '';
+    const b = [];
+    if (isDone) {
+      b.push(`<button class="op" data-act="reopen" data-id="${t.id}">↩ 戻す</button>`);
+      b.push(`<button class="op op-primary" data-act="pick" data-id="${t.id}">▶ もう一度</button>`);
+    } else if (isCur) {
+      b.push(`<button class="op op-primary" data-act="done" data-id="${t.id}">✓ 済にする</button>`);
+    } else {
+      b.push(`<button class="op op-primary" data-act="pick" data-id="${t.id}">▶ 話す</button>`);
+      b.push(`<button class="op" data-act="done" data-id="${t.id}">✓ 済</button>`);
+    }
+    b.push(`<button class="op" data-act="edit" data-id="${t.id}" aria-label="編集">✎</button>`);
+    b.push(`<button class="op op-danger" data-act="del" data-id="${t.id}">削除</button>`);
+    return `<div class="ops">${b.join('')}</div>`;
+  }
+
+  function renderList() {
+    const { open, done } = PD.sortTopics(S.topics);
+    $('#count').textContent = `${open.length}件 · 票数順`;
+    const row = t => {
+      const isCur = t.id === S.currentId, isDone = t.status === 'done';
+      return `<li class="row${isCur ? ' now' : ''}${isDone ? ' done' : ''}">
+        <div class="votes"><span class="n">${t.voters.length}</span><span class="lbl">票</span></div>
+        <div class="body">
+          <div class="t">${PD.esc(t.title)}</div>
+          <div class="m">${t.author ? `<span>by ${PD.esc(t.author)}</span>` : '<span>匿名</span>'}${isCur ? '<span class="chip chip-now">NOW</span>' : ''}${isDone ? '<span class="chip">済</span>' : ''}</div>
+          ${ops(t, isCur, isDone)}
+        </div>
+      </li>`;
+    };
+    $('#topics').innerHTML = (open.length || done.length)
+      ? open.map(row).join('') + done.map(row).join('')
+      : '<li class="empty">まだトピックがありません</li>';
+  }
+
+  function tick() {
+    if (!S) return;
+    const t = S.timer;
+    const rem = PD.remainingMs(t, now());
+    const dur = t.durationMs || 1;
+    $('#digits').textContent = PD.fmt(rem);
+    $('#fill').style.width = (Math.max(0, Math.min(1, rem / dur)) * 100) + '%';
+    const timer = $('#timer');
+    timer.classList.toggle('warn', rem > 0 && rem < 60000);
+    timer.classList.toggle('over', rem <= 0);
+    timer.classList.toggle('paused', !t.running);
+    $('#timerNote').textContent = rem <= 0 ? '時間です！ 次のトピックへ' : (!t.running ? '一時停止中' : (rem < 60000 ? 'あと1分、まとめに入ろう' : ''));
+    $('#toggleBtn').textContent = t.running ? '⏸ 一時停止' : '▶ 再開';
+    if (rem <= 0 && t.running && S.currentId && firedFor !== t.endsAt) { firedFor = t.endsAt; chime(); }
+  }
+  setInterval(tick, 250);
+
+  // ---- 進行役の操作 ----
+  document.addEventListener('click', async e => {
+    const b = e.target.closest('[data-act]');
+    if (!b || !admin) return;
+    const { act, arg, id } = b.dataset;
+    try {
+      switch (act) {
+        case 'timer-toggle': await A('/api/admin/timer', 'POST', { action: S.timer.running ? 'pause' : 'start' }); break;
+        case 'timer': await A('/api/admin/timer', 'POST', { action: arg }); break;
+        case 'add': await A('/api/admin/timer', 'POST', { action: 'add', seconds: Number(arg) }); break;
+        case 'pick': await A('/api/admin/current', 'POST', { id }); break;
+        case 'clear-current': await A('/api/admin/current', 'POST', { id: null }); break;
+        case 'done-current': if (S.currentId) await A(`/api/admin/topics/${S.currentId}`, 'PATCH', { status: 'done' }); break;
+        case 'done': await A(`/api/admin/topics/${id}`, 'PATCH', { status: 'done' }); break;
+        case 'reopen': await A(`/api/admin/topics/${id}`, 'PATCH', { status: 'open' }); break;
+        case 'edit': {
+          const t = S.topics.find(x => x.id === id); if (!t) break;
+          const title = prompt('トピック', t.title); if (title == null) break;
+          const author = prompt('名前', t.author || ''); if (author == null) break;
+          await A(`/api/admin/topics/${id}`, 'PATCH', { title, author });
+          break;
+        }
+        case 'del': {
+          const t = S.topics.find(x => x.id === id);
+          if (t && confirm(`削除しますか？\n「${t.title}」`)) await A(`/api/admin/topics/${id}`, 'DELETE');
+          break;
+        }
+        case 'saveUrl': await A('/api/admin/settings', 'POST', { publicUrl: $('#publicUrl').value.trim() }); dirty.url = false; toast('参加者URLを保存しました'); break;
+        case 'saveMin': await A('/api/admin/settings', 'POST', { defaultMinutes: Number($('#defMin').value) }); dirty.min = false; toast('保存しました'); break;
+        case 'saveTitle': await A('/api/admin/settings', 'POST', { eventTitle: $('#evTitle').value.trim() }); dirty.title = false; toast('保存しました'); break;
+        case 'reset': {
+          const label = { votes: '全トピックの票を0にします', done: '済をすべて未完了に戻します', all: 'トピックを全部消します（元に戻せません）' }[arg];
+          if (confirm(label + '。よろしいですか？')) await A('/api/admin/reset', 'POST', { what: arg });
+          break;
+        }
+      }
+    } catch {}
+  });
+
+  $('#publicUrl').addEventListener('input', () => { dirty.url = true; });
+  $('#defMin').addEventListener('input', () => { dirty.min = true; });
+  $('#evTitle').addEventListener('input', () => { dirty.title = true; });
+
+  $('#addForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const title = $('#addTitle').value.trim();
+    if (!title || !admin) return;
+    try {
+      await A('/api/admin/topics', 'POST', { title });
+      $('#addTitle').value = '';
+    } catch {}
+  });
+
+  let toastTimer;
+  function toast(text) {
+    const el = $('#toast'); el.textContent = text; el.hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2400);
+  }
+
+  // ---- チャイム: ブラウザの制約で最初のクリックまで音が出ないので、ボタンで有効化する ----
+  let ctx = null, unlocked = false;
+  function unlock() {
+    try {
+      ctx = ctx || new (window.AudioContext || window.webkitAudioContext)();
+      ctx.resume().then(() => {
+        unlocked = true;
+        const b = $('#audio'); b.textContent = 'チャイム: オン'; b.classList.add('on');
+      });
+    } catch {}
+  }
+  $('#audio').addEventListener('click', () => { if (unlocked) chime(); else unlock(); });
+  function chime() {
+    if (!ctx || !unlocked) return;
+    const t0 = ctx.currentTime;
+    [[880, 0], [1108, .18], [1318, .36]].forEach(([f, dt]) => {
+      const o = ctx.createOscillator(), g = ctx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + dt);
+      g.gain.exponentialRampToValueAtTime(0.3, t0 + dt + .02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + .7);
+      o.connect(g).connect(ctx.destination);
+      o.start(t0 + dt); o.stop(t0 + dt + .75);
+    });
+  }
+})();
+</script>
+</body>
+</html>

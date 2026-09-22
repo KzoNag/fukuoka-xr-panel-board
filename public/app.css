@@ -1,0 +1,106 @@
+/* 共有トークンと基本部品。ページ固有のスタイルは各HTMLの <style> に置く。 */
+:root {
+  --bg: #f7f5ef;
+  --surface: #ffffff;
+  --surface-2: #efebe1;
+  --ink: #1c1a2e;
+  --muted: #6f6a86;
+  --line: #dcd7ca;
+  --accent: #f28c00;
+  --accent-ink: #1c1a2e;
+  --accent-soft: #ffe9c7;
+  --vote: #2f6fed;
+  --vote-ink: #ffffff;
+  --vote-soft: #e3ebff;
+  --danger: #d84a4a;
+  --ok: #25a36f;
+  --radius: 14px;
+  --gutter: 16px;
+  --font-body: "Zen Kaku Gothic New", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", system-ui, sans-serif;
+  --font-display: "Dela Gothic One", "Hiragino Sans", "Hiragino Kaku Gothic ProN", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #141221; --surface: #1e1b2e; --surface-2: #2a2640; --ink: #f3efe4; --muted: #a49fbb; --line: #37324d;
+    --accent: #ffb02e; --accent-soft: #3d2f14; --vote: #6cc7ff; --vote-ink: #0f1a24; --vote-soft: #173042;
+    --danger: #ff6b6b; --ok: #4ad294;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #141221; --surface: #1e1b2e; --surface-2: #2a2640; --ink: #f3efe4; --muted: #a49fbb; --line: #37324d;
+  --accent: #ffb02e; --accent-soft: #3d2f14; --vote: #6cc7ff; --vote-ink: #0f1a24; --vote-soft: #173042;
+  --danger: #ff6b6b; --ok: #4ad294;
+}
+
+* { box-sizing: border-box; }
+/* display を指定した要素でも hidden 属性で確実に消す */
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+button, input, textarea { font: inherit; color: inherit; }
+a { color: var(--vote); }
+
+.eyebrow { font-size: .78rem; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+.muted { color: var(--muted); }
+
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .4em;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 999px; padding: .55em 1.1em; cursor: pointer; font-weight: 700; line-height: 1;
+  min-height: 44px; transition: transform .08s ease, background .15s ease;
+}
+.btn:active { transform: scale(.97); }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn-ghost { background: transparent; }
+.btn-danger { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 45%, transparent); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+.btn-sm { min-height: 36px; padding: .4em .85em; font-size: .9rem; }
+.btn:focus-visible, .vote:focus-visible, .input:focus-visible { outline: 3px solid var(--vote); outline-offset: 2px; }
+
+.input {
+  width: 100%; border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+  border-radius: 12px; padding: .7em .9em; min-height: 44px;
+}
+textarea.input { resize: vertical; line-height: 1.5; }
+.input::placeholder { color: var(--muted); opacity: .8; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
+
+.chip {
+  display: inline-block; font-size: .72rem; font-weight: 700; letter-spacing: .06em;
+  padding: .2em .65em; border-radius: 999px; background: var(--surface-2); color: var(--muted); line-height: 1.5;
+}
+.chip-now { background: var(--accent); color: var(--accent-ink); }
+.chip-mine { background: var(--vote-soft); color: var(--vote); }
+
+/* 投票ボタン: ▲ と票数 */
+.vote {
+  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
+  min-width: 56px; min-height: 56px; padding: 4px 8px; border-radius: 12px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; line-height: 1;
+  transition: transform .08s ease, background .15s ease;
+}
+.vote:active { transform: scale(.94); }
+.vote .tri { font-size: .75rem; color: var(--muted); }
+.vote .n { font-family: var(--font-display); font-size: 1.3rem; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.vote.on { background: var(--vote); border-color: var(--vote); color: var(--vote-ink); }
+.vote.on .tri { color: var(--vote-ink); }
+.vote[disabled] { opacity: .45; cursor: default; }
+
+.conn { display: inline-flex; align-items: center; gap: .45em; font-size: .8rem; color: var(--muted); }
+.conn::before { content: ""; width: .55em; height: .55em; border-radius: 50%; background: var(--ok); }
+.conn.off::before { background: var(--accent); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation: none !important; transition: none !important; }
+}

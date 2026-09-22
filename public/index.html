@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<link rel="icon" href="data:,">
+<title>福岡XR部 パネルディスカッション</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="/app.css">
+<style>
+  body { padding: 0 var(--gutter) env(safe-area-inset-bottom, 0px); }
+  .wrap { max-width: 640px; margin: 0 auto; padding-block: 22px 56px; display: grid; gap: 18px; }
+  .top { display: grid; gap: 4px; }
+  .top h1 { font-family: var(--font-display); font-weight: 400; font-size: 1.55rem; letter-spacing: .02em; }
+  .lead { color: var(--muted); font-size: .95rem; }
+
+  .lost { padding: 12px 16px; border-left: 6px solid var(--danger); color: var(--danger); font-weight: 700; }
+  .now-card { padding: 16px 18px; border-left: 6px solid var(--accent); }
+  .now-title { font-size: 1.25rem; font-weight: 700; margin-top: 4px; line-height: 1.4; overflow-wrap: anywhere; }
+  .now-empty { color: var(--muted); font-weight: 500; font-size: 1.05rem; }
+  .now-meta { display: flex; flex-wrap: wrap; gap: .4em 1em; margin-top: 8px; color: var(--muted); font-size: .9rem; align-items: baseline; }
+  .now-timer { font-family: var(--font-display); font-size: 1.15rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .now-timer.warn { color: var(--accent); }
+  .now-timer.over { color: var(--danger); }
+
+  .post { padding: 16px 18px; display: grid; gap: 10px; }
+  .post label { font-weight: 700; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .row .input { flex: 1 1 160px; }
+  .msg { font-size: .9rem; color: var(--ok); }
+  .msg.err { color: var(--danger); }
+  .counter { font-size: .78rem; color: var(--muted); text-align: right; }
+
+  .list { display: grid; gap: 10px; }
+  .list-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .list-head h2 { font-size: 1.05rem; }
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .topic { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; }
+  .topic.current { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .topic.done { opacity: .6; }
+  .topic .body { flex: 1; min-width: 0; }
+  .topic .title { font-weight: 700; line-height: 1.4; overflow-wrap: anywhere; }
+  .topic.done .title { text-decoration: line-through; text-decoration-color: var(--muted); }
+  .topic .meta { display: flex; flex-wrap: wrap; gap: .5em; align-items: center; margin-top: 5px; font-size: .8rem; color: var(--muted); }
+  .done-head { font-size: .9rem; color: var(--muted); margin-top: 10px; }
+  .empty { color: var(--muted); text-align: center; padding: 24px 0; }
+  footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: .8rem; color: var(--muted); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="eyebrow" id="eventTitle">福岡XR部ミートアップ 2026.09</div>
+    <h1>パネルディスカッション</h1>
+    <p class="lead">気になるトピックを投げて、話したいものに ▲ を。匿名でOK。</p>
+  </header>
+
+  <div id="lost" class="card lost" hidden>サーバーに繋がりません。URLが変わった可能性があるので、会場のQRをもう一度読み込んでください。</div>
+
+  <section id="now" class="card now-card" aria-live="polite"></section>
+
+  <section class="card post">
+    <form id="postForm">
+      <label for="title">トピックを投稿</label>
+      <textarea id="title" class="input" maxlength="100" rows="2" placeholder="例: スマートグラス、ぶっちゃけ普段使いしてる？" required></textarea>
+      <div class="counter"><span id="titleLen">0</span>/100</div>
+      <div class="row">
+        <input id="author" class="input" maxlength="24" placeholder="名前（任意）" autocomplete="nickname">
+        <button class="btn btn-primary" type="submit" id="postBtn">投稿する</button>
+      </div>
+      <div id="postMsg" class="msg" hidden></div>
+    </form>
+  </section>
+
+  <section class="list">
+    <div class="list-head"><h2>トピック一覧</h2><span id="count" class="muted"></span></div>
+    <ul id="topics"></ul>
+    <h3 class="done-head" id="doneHead" hidden>話し終わったトピック</h3>
+    <ul id="doneTopics"></ul>
+  </section>
+
+  <footer>
+    <span>1端末につき1トピック1票。もう一度タップで取り消し。</span>
+    <span id="conn" class="conn">接続中…</span>
+  </footer>
+</div>
+
+<script src="/app.js"></script>
+<script>
+(() => {
+  const $ = s => document.querySelector(s);
+  const cid = PD.clientId();
+  let mine = new Set();
+  try { mine = new Set(JSON.parse(localStorage.getItem('pd.mine') || '[]')); } catch {}
+  try { $('#author').value = localStorage.getItem('pd.author') || ''; } catch {}
+
+  let S = null, now = () => Date.now();
+  PD.connect((s, n) => { S = s; now = n; render(); }, st => {
+    const el = $('#conn');
+    el.classList.toggle('off', st !== 'live');
+    el.textContent = st === 'live' ? 'リアルタイム接続中' : '再接続中…';
+    $('#lost').hidden = st !== 'lost';
+  });
+
+  function render() {
+    $('#eventTitle').textContent = S.eventTitle;
+    renderNow();
+    renderList();
+  }
+
+  function renderNow() {
+    const cur = S.topics.find(t => t.id === S.currentId);
+    $('#now').innerHTML = cur
+      ? `<div class="eyebrow">いま話しているトピック</div>
+         <div class="now-title">${PD.esc(cur.title)}</div>
+         <div class="now-meta">${cur.author ? `<span>by ${PD.esc(cur.author)}</span>` : ''}<span id="nowTimer" class="now-timer"></span></div>`
+      : `<div class="eyebrow">トピック募集中</div>
+         <div class="now-title now-empty">進行役が選んだトピックがここに出ます。まずは気になる話題を投げてください。</div>`;
+    tick();
+  }
+
+  function tick() {
+    const el = $('#nowTimer');
+    if (!el || !S) return;
+    const rem = PD.remainingMs(S.timer, now());
+    el.textContent = rem <= 0 ? '時間です' : (S.timer.running ? '残り ' : '一時停止 ') + PD.fmt(rem);
+    el.classList.toggle('over', rem <= 0);
+    el.classList.toggle('warn', rem > 0 && rem < 60000);
+  }
+  setInterval(tick, 500);
+
+  function item(t) {
+    const voted = t.voters.includes(cid);
+    const isCur = t.id === S.currentId;
+    const done = t.status === 'done';
+    const chips = [
+      isCur ? '<span class="chip chip-now">いま話してる</span>' : '',
+      mine.has(t.id) ? '<span class="chip chip-mine">あなたの投稿</span>' : '',
+      done ? '<span class="chip">済</span>' : '',
+    ].join('');
+    return `<li class="card topic${isCur ? ' current' : ''}${done ? ' done' : ''}">
+      <button class="vote${voted ? ' on' : ''}" data-id="${t.id}" aria-pressed="${voted}" ${done ? 'disabled' : ''} aria-label="話したい">
+        <span class="tri">▲</span><span class="n">${t.voters.length}</span>
+      </button>
+      <div class="body">
+        <div class="title">${PD.esc(t.title)}</div>
+        <div class="meta">${t.author ? `<span>by ${PD.esc(t.author)}</span>` : '<span>匿名</span>'}${chips}</div>
+      </div>
+    </li>`;
+  }
+
+  function renderList() {
+    const { open, done } = PD.sortTopics(S.topics);
+    $('#count').textContent = `${open.length}件 · 票数順`;
+    $('#topics').innerHTML = open.length ? open.map(item).join('') : '<li class="empty">まだトピックがありません。最初の1つを投げよう！</li>';
+    $('#doneHead').hidden = !done.length;
+    $('#doneTopics').innerHTML = done.map(item).join('');
+  }
+
+  // 投票: 先に画面を切り替えてから送る(楽観更新)。失敗したら次の state で戻る。
+  document.addEventListener('click', async e => {
+    const btn = e.target.closest('.vote');
+    if (!btn || btn.disabled) return;
+    const t = S.topics.find(x => x.id === btn.dataset.id);
+    if (!t) return;
+    const i = t.voters.indexOf(cid);
+    if (i >= 0) t.voters.splice(i, 1); else t.voters.push(cid);
+    renderList();
+    try { await PD.api(`/api/topics/${t.id}/vote`, 'POST', { clientId: cid }); }
+    catch (err) { showMsg(err.message, true); try { S = await PD.api('/api/state'); render(); } catch {} }
+  });
+
+  $('#title').addEventListener('input', () => { $('#titleLen').textContent = $('#title').value.length; });
+
+  $('#postForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const title = $('#title').value.trim();
+    const author = $('#author').value.trim();
+    if (!title) return;
+    $('#postBtn').disabled = true;
+    try {
+      const r = await PD.api('/api/topics', 'POST', { title, author, clientId: cid });
+      mine.add(r.id);
+      try { localStorage.setItem('pd.mine', JSON.stringify([...mine])); localStorage.setItem('pd.author', author); } catch {}
+      $('#title').value = ''; $('#titleLen').textContent = '0';
+      showMsg('投稿しました！ボードに反映されます。');
+    } catch (err) { showMsg(err.message, true); }
+    finally { $('#postBtn').disabled = false; }
+  });
+
+  let msgTimer;
+  function showMsg(text, err) {
+    const el = $('#postMsg');
+    el.textContent = text; el.classList.toggle('err', !!err); el.hidden = false;
+    clearTimeout(msgTimer); msgTimer = setTimeout(() => { el.hidden = true; }, 3000);
+  }
+})();
+</script>
+</body>
+</html>
